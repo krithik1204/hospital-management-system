@@ -10,44 +10,55 @@ import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.hospital.security.UserDetailsServiceImpl;
 
+import jakarta.servlet.http.HttpServletResponse;
+
 @Configuration
 public class SecurityConfig {
 
     @Autowired
     private UserDetailsServiceImpl detailsServiceImpl;
+    
+    @Autowired
+	private JwtAuthenticationFilter jwtAuthenticationFilter;
 
     // ✅ SECURITY FILTER CHAIN
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
-        http
-            .csrf(csrf -> csrf.disable())
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .authenticationProvider(authenticationProvider())
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/", "/hospital/**", "/home",
-                        "/api/patients/register", "/api/login").permitAll()
+		http.csrf(csrf -> csrf.disable()).cors(cors -> cors.configurationSource(corsConfigurationSource()))
+				.authenticationProvider(authenticationProvider())
+				.authorizeHttpRequests(auth -> auth
+						.requestMatchers("/", "/hospital/**", "/home", "/api/patients/register", "/api/login")
+						.permitAll()
 
-                .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                .requestMatchers("/api/doctor/**").hasAnyRole("DOCTOR", "ADMIN")
-                .requestMatchers("/api/nurse/**").hasRole("NURSE")
-                .requestMatchers("/api/staff/**").hasRole("STAFF")
-                .requestMatchers("/api/patients/**").hasAnyRole("PATIENT", "ADMIN")
+						.requestMatchers("/api/admin/**").hasRole("ADMIN").requestMatchers("/api/doctor/**")
+						.hasAnyRole("DOCTOR", "ADMIN").requestMatchers("/api/nurse/**").hasRole("NURSE")
+						.requestMatchers("/api/staff/**").hasRole("STAFF").requestMatchers("/api/patients/**")
+						.hasAnyRole("PATIENT", "ADMIN")
+						.requestMatchers("/health").hasRole("PATIENT")
+						.anyRequest().authenticated())
+				.exceptionHandling(
+						exception -> exception.authenticationEntryPoint((request, response, authException) -> {
+							response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+							response.setContentType("application/json");
+							response.getWriter().write("{\"error\": \"" + authException.getMessage() + "\"}");
+						}))
+				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+				.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
-                .anyRequest().authenticated()
-            );
-
-        return http.build();
-    }
+		return http.build();
+	}
 
     // ✅ AUTH PROVIDER (IMPORTANT FIX)
     @Bean

@@ -20,7 +20,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.hospital.dto.request.LoginRequest;
+import com.hospital.security.config.JwtTokenUtil;
 import com.hospital.service.PatientService;
+
+
 
 @RestController
 public class AuthController {
@@ -29,6 +32,9 @@ public class AuthController {
 
     @Autowired
     private AuthenticationManager authenticationManager;
+    
+    @Autowired
+    JwtTokenUtil jwtTokenUtil;
 
    
     @Autowired
@@ -67,13 +73,17 @@ public class AuthController {
             Collection<? extends GrantedAuthority> authorities = authentication.getAuthorities();
             String role = authorities.isEmpty() ? "" : authorities.iterator().next().getAuthority();
 
+         // Generate JWT token
+            String token = jwtTokenUtil.generateToken(userDetails,role);
+            logger.info("JWT Token generated successfully for user: {}", userDetails.getUsername());
+
             
 
             // Prepare the response
             Map<String, Object> response = new HashMap<>();
             response.put("email", userDetails.getUsername());
             response.put("role", role);
-
+            response.put("token", token);
             // Check user role and fetch additional details if patient
 //            if ("ROLE_PATIENT".equals(role)) {
 //                logger.info("Fetching patient details for email: {}", userDetails.getUsername());
