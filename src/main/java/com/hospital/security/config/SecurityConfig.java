@@ -41,11 +41,13 @@ public class SecurityConfig {
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers("/", "/hospital/**", "/home", "/api/patients/register", "/api/login")
 						.permitAll()
-
-						.requestMatchers("/api/admin/**").hasRole("ADMIN").requestMatchers("/api/doctor/**")
-						.hasAnyRole("DOCTOR", "ADMIN").requestMatchers("/api/nurse/**").hasRole("NURSE")
-						.requestMatchers("/api/staff/**").hasRole("STAFF").requestMatchers("/api/patients/**")
-						.hasAnyRole("PATIENT", "ADMIN")
+                       .requestMatchers("/api/appointments/viewAll").hasRole("ADMIN")
+						.requestMatchers("/api/admin/**").hasRole("ADMIN")
+						 .requestMatchers("/api/appointments/create").hasRole("PATIENT")
+						.requestMatchers("/api/doctor/**").hasAnyRole("DOCTOR", "ADMIN")
+						.requestMatchers("/api/nurse/**").hasRole("NURSE")
+						.requestMatchers("/api/staff/**").hasRole("STAFF")
+						.requestMatchers("/api/patients/**").hasAnyRole("PATIENT", "ADMIN")
 						.requestMatchers("/health").hasRole("PATIENT")
 						.anyRequest().authenticated())
 				.exceptionHandling(
@@ -84,7 +86,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000"));
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
         configuration.setAllowCredentials(true);
@@ -93,4 +95,6 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }
+    
+    
 }

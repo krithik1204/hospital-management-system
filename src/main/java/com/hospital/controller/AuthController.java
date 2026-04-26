@@ -2,6 +2,7 @@ package com.hospital.controller;
 
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.slf4j.Logger;
@@ -71,18 +72,25 @@ public class AuthController {
 
             UserDetails userDetails = (UserDetails) authentication.getPrincipal();
             Collection<? extends GrantedAuthority> authorities = authentication.getAuthorities();
-            String role = authorities.isEmpty() ? "" : authorities.iterator().next().getAuthority();
-
+         //   String role = authorities.isEmpty() ? "" : authorities.iterator().next().getAuthority();
+           
+            List<String> roles = authorities.stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .filter(role -> role.startsWith("ROLE_"))  // 🔥 important fix
+                    .toList();
+            
+          
          // Generate JWT token
-            String token = jwtTokenUtil.generateToken(userDetails,role);
+            String token = jwtTokenUtil.generateToken(userDetails,roles);
             logger.info("JWT Token generated successfully for user: {}", userDetails.getUsername());
 
             
-
+            
+         
             // Prepare the response
             Map<String, Object> response = new HashMap<>();
             response.put("email", userDetails.getUsername());
-            response.put("role", role);
+            response.put("roles", roles);
             response.put("token", token);
             // Check user role and fetch additional details if patient
 //            if ("ROLE_PATIENT".equals(role)) {

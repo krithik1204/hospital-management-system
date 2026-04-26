@@ -18,10 +18,10 @@ public class JwtTokenUtil {
     private final Key secretKey = Keys.hmacShaKeyFor(Base64.getDecoder().decode(BASE64_SECRET_KEY));
     private static final long JWT_TOKEN_VALIDITY = 24 * 60 * 60 * 1000; // 24 hours
 
-    public String generateToken(UserDetails userDetails, String role) {
+    public String generateToken(UserDetails userDetails, List<String> roles) {
         return Jwts.builder()
                 .setSubject(userDetails.getUsername())
-                .claim("role", role) // Store single role as string
+                .claim("roles", roles) // Store single role as string
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + JWT_TOKEN_VALIDITY))
                 .signWith(secretKey, SignatureAlgorithm.HS512)
@@ -30,8 +30,7 @@ public class JwtTokenUtil {
 
     public List<String> extractRoles(String token) {
         Claims claims = extractAllClaims(token);
-        String role = claims.get("role", String.class);
-        return List.of(role); // Convert single role to List
+        return  claims.get("roles", List.class); // Convert single role to List
     }
 
     public String extractUsername(String token) {
