@@ -21,10 +21,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.hospital.dto.request.LoginRequest;
+import com.hospital.exception.ValidationException;
 import com.hospital.security.config.JwtTokenUtil;
-import com.hospital.service.PatientService;
 
-
+import jakarta.validation.Valid;
 
 @RestController
 public class AuthController {
@@ -37,76 +37,60 @@ public class AuthController {
     @Autowired
     JwtTokenUtil jwtTokenUtil;
 
-   
-    @Autowired
-    private PatientService patientService;
-
     @PostMapping("/api/login")
-    public ResponseEntity<?> loginUser(@RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<Map<String, Object>> loginUser(@Valid @RequestBody LoginRequest loginRequest) {
         String email = loginRequest.getEmail();
         String password = loginRequest.getPassword();
         
-        System.err.println("Attempting to authenticate user with email: {}"+ email);
-        System.err.println("Received password (masked):{}"+ password);
-
-        // Logging input credentials
-        logger.info("Attempting to authenticate user with email: {}", email);
-        logger.info("Received password (masked): {}", password != null ? "[PROVIDED]" : "[NOT PROVIDED]");
-
+        logger.info("Login attempt for user: {}", email);
+        
         // Validate input
-        if (email == null || email.isEmpty() || password == null || password.isEmpty()) {
-            logger.error("Email or password is empty");
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Email and password must not be empty.");
+        validateLoginRequest(email, password);
+        
+        // Attempt authentication - will throw AuthenticationException if failed
+        // GlobalExceptionHandler will catch and handle it
+        logger.info("Authenticating user with Spring Security...");
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(email, password)
+        );
+
+        // If authentication is successful, set the context
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        logger.info("Authentication successful for user: {}", email);
+
+        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+        Collection<? extends GrantedAuthority> authorities = authentication.getAuthorities();
+        
+        List<String> roles = authorities.stream()
+                .map(GrantedAuthority::getAuthority)
+                .filter(role -> role.startsWith("ROLE_"))
+                .toList();
+        
+        // Generate JWT token
+        String token = jwtTokenUtil.generateToken(userDetails, roles);
+        logger.info("JWT Token generated successfully for user: {}", userDetails.getUsername());
+        
+        // Prepare the response
+        Map<String, Object> response = new HashMap<>();
+        response.put("email", userDetails.getUsername());
+        response.put("roles", roles);
+        response.put("token", token);
+        response.put("message", "Login successful");
+
+        return ResponseEntity.ok(response);
+    }
+    
+    /**
+     * Validate login request
+     */
+    private void validateLoginRequest(String email, String password) {
+        if (email == null || email.trim().isEmpty()) {
+            throw new ValidationException("email", null, "Email is required and cannot be empty");
         }
-
-        try {
-            // Attempt authentication
-            logger.info("Authenticating user with Spring Security...");
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(email, password)
-            );
-
-            // If authentication is successful, set the context
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-            logger.info("Authentication successful for user: {}", email);
-
-            UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-            Collection<? extends GrantedAuthority> authorities = authentication.getAuthorities();
-         //   String role = authorities.isEmpty() ? "" : authorities.iterator().next().getAuthority();
-           
-            List<String> roles = authorities.stream()
-                    .map(GrantedAuthority::getAuthority)
-                    .filter(role -> role.startsWith("ROLE_"))  // 🔥 important fix
-                    .toList();
-            
-          
-         // Generate JWT token
-            String token = jwtTokenUtil.generateToken(userDetails,roles);
-            logger.info("JWT Token generated successfully for user: {}", userDetails.getUsername());
-
-            
-            
-         
-            // Prepare the response
-            Map<String, Object> response = new HashMap<>();
-            response.put("email", userDetails.getUsername());
-            response.put("roles", roles);
-            response.put("token", token);
-            // Check user role and fetch additional details if patient
-//            if ("ROLE_PATIENT".equals(role)) {
-//                logger.info("Fetching patient details for email: {}", userDetails.getUsername());
-//                PatientResponse patientResponse = patientService.getPatientByEmail(userDetails.getUsername());
-//                response.put("patientDetails", patientResponse);
-//            } else if ("ROLE_ADMIN".equals(role)) {
-//                response.put("message", "Welcome Admin");
-//            }
-
-            logger.info("Response: {}", response);
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            logger.error("Authentication failed for user: {}. Error: {}", email, e.getMessage());
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid email or password.");
+        
+        if (password == null || password.trim().isEmpty()) {
+            throw new ValidationException("password", null, "Password is required and cannot be empty");
         }
     }
 }
+
